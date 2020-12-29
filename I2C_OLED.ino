@@ -158,7 +158,7 @@ void setup() {
 
   //writeDisplay();
 
-  writeText(0, 0, "ABABAB");         // column, page, string
+  writeText(0, 0, "A B C D E F G H I J K L");         // column, page, string
 }
 
 void loop() {

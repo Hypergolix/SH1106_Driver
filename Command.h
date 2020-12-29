@@ -7,41 +7,6 @@
 
 // byte increment = 0x00;   // This may be ok to be global
 
-bool fontSpc [8][2] =
-{ {0, 0},
-  {0, 0},
-  {0, 0},
-  {0, 0},
-  {0, 0},
-  {0, 0},
-  {0, 0},
-  {0, 0}
-};
-
-bool fontA [8][8] =
-{ {0, 0, 1, 1, 1, 1, 0, 0},
-  {0, 1, 1, 0, 0, 1, 1, 0},
-  {1, 1, 0, 0, 0, 0, 1, 1},
-  {1, 1, 0, 0, 0, 0, 1, 1},
-  {1, 1, 1, 1, 1, 1, 1, 1},
-  {1, 1, 1, 1, 1, 1, 1, 1},
-  {1, 1, 0, 0, 0, 0, 1, 1},
-  {1, 1, 0, 0, 0, 0, 1, 1}
-};          // Row by column. Byte array may be more efficient
-// One big array or multiple letters?
-
-bool fontB [8][8] =
-{ {1, 1, 1, 1, 1, 1, 1, 0},
-  {1, 1, 0, 0, 0, 0, 1, 1},
-  {1, 1, 0, 0, 0, 0, 1, 1},
-  {1, 1, 1, 1, 1, 1, 1, 0},
-  {1, 1, 1, 1, 1, 1, 1, 0},
-  {1, 1, 0, 0, 0, 0, 1, 1},
-  {1, 1, 0, 0, 0, 0, 1, 1},
-  {1, 1, 1, 1, 1, 1, 1, 0}
-};
-
-
 // Rename some of these variables
 void singleC_OP(byte firstParam) {                  // Single command OP
   Wire.beginTransmission(DEVICE_ID);                //
@@ -64,70 +29,172 @@ void RAM_OP(byte firstParam) {                      // RAM operation OP
   Wire.write(firstParam);                           // Usually addresses the register
   Wire.endTransmission();                           //
 }
+
 // This one sets it to the leftmost column position
 void columnSet() {                                  // Resets column to the first one. Have arguments for a distance from the left
   //Set Start Column
   singleC_OP(B00000010);                            // 0010
   singleC_OP(B00010000);                            // 0000
 }
+
 // Manual increment, could change this so that only one arg is passed. Lower and Higher in the same byte
-void incrementC(byte higher, byte lower) {         //
+void incrementC(byte higher, byte lower) {          //
   //Set Start Column
   singleC_OP(B00010000 + higher);                   // 0000
-  singleC_OP(B00000010 + lower);                    // 0010
+  singleC_OP(B00000000 + lower);                    // 0010
 }
+
 // Takes the page as an argument. Always calls column set so that whenever setPage is called it will also begin from the leftmost column
 void setPage(byte page) {                           // Just sets the page and uses the first column
   singleC_OP(0xB0 + page);                          // , byte data? 0xB0 + page
   columnSet();
 }
 
-void writeLetter(bool letterSelect[][8], byte increment) {
+void writeSpace(uint8_t spaceSize) {                // Deals with writing spaces
+  for (int y = 0; y < spaceSize; y++) {             // Iterates for the number of spaces
+    RAM_OP(0x00);                                   // Writes spaces
+  }
+}
 
-  // increment = increment + 2;                        // Account for spacing, replace 2 with var for variable spacing
-
-  byte lower = increment & B00001111;               // Works out Lower 4 bits - just formatting
-  byte higher = (increment & B11110000) >> 4;              // Works out Higher 4 bits - just formatting
-
-  incrementC(higher, lower);                        // Just zeroes both column and page address, adds increment (0xB0 + increment);
+void writeLetter(bool letterSelect[][8]) {
+  uint8_t space = 2;                                // Paramater for space width, in pixels. Default = 2. In future could have custom space width
 
   for (int i = 0; i < 8; i++) {                     // Line. Iterate for length of array
     byte column = B00000000;
     for (int yPos = 0; yPos < 8; yPos++) {          // Height
       column = column | ((letterSelect[yPos][i]) << (7 - yPos));
     }
-    // Writes to display
+    // Writes column to display
     RAM_OP(column);                                 // Writes one column to the display
   }
 
 }
 
-uint8_t space = 1; // MAX 1px space at the moment, must be something odd going on further up when going above this. Masks/Shifts etc
-// Again, could use a global variable that keeps track of the column where the next letter is allowed to be placed and this counter
-// Is incremented with each letter
-// Alternatively string together the entire "sentence" into one array and then just print that entire array in one go to the display
-// Remember to decide between using individual arrays for each letter or one big one for the entire font face which contains 
-// The entire alphabet. Could Optimize by makeing byte arrays - however less legible. Advantages of individual array for each
-// Letter means you can mix and match fonts and styles 
-
-// Sort out the reason for why the display stops incrementing by itself after each letter, This would solve a lot of issues related 
-// To spacing and accidental overwrites
-
 void writeText(byte column, byte page, String text) {
+  uint8_t increment = 2 + column;                                         // 2 default to account for pixel difference
+
   setPage(page);
-  
+
+  byte lower = increment & B00001111;                                     // Works out Lower 4 bits - just formatting
+  byte higher = (increment & B11110000) >> 4;                             // Works out Higher 4 bits - just formatting
+
+  incrementC(higher, lower);                                              // Just sets the start column address. Would it be better to only take one number as an argument?
+
   for (uint8_t stringPos = 0; stringPos < text.length(); stringPos++) {   // Iterates for length of the string
-    byte increment = (stringPos * (8 + space)) + column;                            // Works out the amount to increment by so letters don't overwrite. Now adds column offset
-    //increment = increment + 8; // + spacing?
     switch (text.charAt(stringPos)) {                                     // Accesses specific character of string
       case 'A':
-        writeLetter(fontA, increment);   // fontA (stringPos * 8) In the future just return the array and then write the fucntion call once at the bottom. Deal with increment
+        writeLetter(fontA);   // In the future just return the array and then write the fucntion call once at the bottom. Deal with increment
         // return(fontA);
         break;
       case 'B':
-        writeLetter(fontB, increment);   // fontB (stringPos * 8)
+        writeLetter(fontB);   // fontB (stringPos * 8)
         // return(fontB);
         break;
+      case 'C':
+        writeLetter(fontC);   // fontB (stringPos * 8)
+        // return(fontC);
+        break;
+      case 'D':
+        writeLetter(fontD);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'E':
+        writeLetter(fontE);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'F':
+        writeLetter(fontF);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'G':
+        writeLetter(fontG);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'H':
+        writeLetter(fontH);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'I':
+        writeLetter(fontI);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'J':
+        writeLetter(fontJ);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'K':
+        writeLetter(fontK);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'L':
+        writeLetter(fontL);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'M':
+        writeLetter(fontM);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'N':
+        writeLetter(fontN);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'O':
+        writeLetter(fontO);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'P':
+        writeLetter(fontP);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'Q':
+        writeLetter(fontQ);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'R':
+        writeLetter(fontR);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'S':
+        writeLetter(fontS);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'T':
+        writeLetter(fontT);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'U':
+        writeLetter(fontU);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'V':
+        writeLetter(fontV);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'W':
+        writeLetter(fontW);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'X':
+        writeLetter(fontX);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'Y':
+        writeLetter(fontY);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case 'Z':
+        writeLetter(fontZ);   // fontB (stringPos * 8)
+        // return();
+        break;
+      case ' ':
+        writeSpace(2);        // Argument is the width of the space
+        // return(fontSpace);
+        break;
+      default:                // If the letter does't exist draw the not found symbol
+        writeLetter(fontDefault);
+        break;
     }
+
+    // Call here as one function call? writeLetter(font, ifSpace);
   }
 }
