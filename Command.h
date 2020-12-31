@@ -1,11 +1,6 @@
-// WriteDisplay(column add,Page add ,DATA); TEXT
-//#include "Fonts.h"
-
 #define DEVICE_ID 0x3C
 #define COMMAND 0x00
 #define RAMCOMMAND 0x40
-
-// byte increment = 0x00;   // This may be ok to be global
 
 // Rename some of these variables
 void singleC_OP(byte firstParam) {                  // Single command OP
@@ -62,12 +57,11 @@ void writeLetter(bool letterSelect[][8]) {
   for (int i = 0; i < 8; i++) {                     // Line. Iterate for length of array
     byte column = B00000000;
     for (int yPos = 0; yPos < 8; yPos++) {          // Height
-      column = column | ((letterSelect[yPos][i]) << (7 - yPos));
+      column = column | ((letterSelect[yPos][i]) << yPos); // OLD = (7 - yPos). NEW yPos
     }
     // Writes column to display
     RAM_OP(column);                                 // Writes one column to the display
   }
-
 }
 
 void writeText(byte column, byte page, String text) {
